@@ -1,150 +1,150 @@
 # Arc Code
 
-Analisador de arquitetura para projetos TypeScript/JavaScript. Lê o código-fonte real e gera diagramas Mermaid descrevendo a arquitetura **que existe**, não uma arquitetura ideal inventada.
+Architecture analyzer for TypeScript/JavaScript projects. Reads the real source code and generates Mermaid diagrams describing the architecture **that exists**, not an invented ideal architecture.
 
 ```bash
 npx arc-code generate-diagrams
 ```
 
-## O que é — e o que não é
+## What it is — and what it isn't
 
-- **Não usa IA.** Nenhuma chamada de rede, nenhuma API key, nenhum modelo.
-- **Análise 100% estática**, via TypeScript Compiler API. O código do projeto analisado nunca é executado.
-- **Determinístico**: rodar duas vezes no mesmo código produz o mesmo resultado (ignorando o timestamp do manifest).
-- Quando uma informação não pode ser determinada estaticamente, o Arc Code mostra `unknown` ou omite — nunca inventa.
+- **No AI.** No network calls, no API keys, no models.
+- **100% static analysis**, via the TypeScript Compiler API. The analyzed project's code is never executed.
+- **Deterministic**: running it twice on the same code produces the same result (ignoring the manifest's timestamp).
+- When something can't be determined statically, Arc Code shows `unknown` or omits it — it never invents.
 
-A IA é uma consumidora futura do Arc Code, não uma dependência dele. O formato `.arch/` é pensado para ser lido por ferramentas como Claude Code, Cursor etc., não para substituir o julgamento humano sobre arquitetura.
+AI is a future consumer of Arc Code, not a dependency of it. The `.arch/` format is meant to be read by tools like Claude Code, Cursor, etc. — not to replace human judgment about architecture.
 
-## Uso
+## Usage
 
 ```bash
-cd seu-projeto
+cd your-project
 npx arc-code generate-diagrams
 ```
 
-Gera uma pasta `.arch/` na raiz do projeto analisado:
+Generates an `.arch/` folder at the root of the analyzed project:
 
 ```
 .arch/
-  architecture.mmd    # camadas detectadas (ou o grafo real de diretórios, se não houver camadas conhecidas)
-  routes.mmd           # rotas HTTP (Express) -> handler -> chamadas diretas -> retorno (flowchart)
-  sequence.mmd         # as mesmas rotas, como sequenceDiagram (quem chama quem, em ordem)
-  classes.mmd          # classes/interfaces, membros, e relações extends/implements/uses
-  dependencies.mmd     # grafo de imports, com ciclos e violações de camada marcados
-  functions.mmd        # toda função/método, com complexidade Big-O estimada e grafo de chamadas
-  manifest.json        # versão, linguagem, arquivos analisados, timestamp, e um ÍNDICE (ver abaixo)
-  domains/             # uma subpasta por recurso detectado (ver "Sub-fluxos por recurso" abaixo)
-    <recurso>/         # ex: customer/, deal/ — os mesmos 6 .mmd, recortados pra esse recurso
+  architecture.mmd    # detected layers (or the real directory graph, if no known layers are found)
+  routes.mmd           # HTTP routes (Express) -> handler -> direct calls -> return (flowchart)
+  sequence.mmd         # the same routes, as a sequenceDiagram (who calls whom, in order)
+  classes.mmd          # classes/interfaces, members, and extends/implements/uses relations
+  dependencies.mmd     # import graph, with cycles and layer violations flagged
+  functions.mmd        # every function/method, with estimated Big-O complexity and a call graph
+  manifest.json        # version, language, analyzed files, timestamp, and an INDEX (see below)
+  domains/             # one subfolder per detected resource (see "Per-resource sub-flows" below)
+    <resource>/         # e.g. customer/, deal/ — the same 6 .mmd files, scoped to that resource
       architecture.mmd
       routes.mmd
       classes.mmd
       dependencies.mmd
       functions.mmd
       sequence.mmd
-  routes/              # um .mmd por rota, flowchart (ver "Mini-fluxos" abaixo)
-  sequence/            # a mesma rota, sequenceDiagram
-  functions/           # um .mmd por função/método
-  classes/             # um .mmd por classe/interface
-  dependencies/        # um .mmd por módulo
+  routes/              # one .mmd per route, flowchart (see "Mini-flows" below)
+  sequence/            # the same route, as a sequenceDiagram
+  functions/           # one .mmd per function/method
+  classes/             # one .mmd per class/interface
+  dependencies/        # one .mmd per module
 ```
 
-**`manifest.json` tem um `index`** mapeando cada rota/função/classe/módulo direto pro seu arquivo de mini-fluxo (ex: `index.routes["POST /customers"] -> "routes/00_POST__customers.mmd"`) — pra responder "me mostra o fluxo de X" sem precisar listar a pasta e adivinhar o nome do arquivo primeiro.
+**`manifest.json` has an `index`** mapping each route/function/class/module straight to its mini-flow file (e.g. `index.routes["POST /customers"] -> "routes/00_POST__customers.mmd"`) — to answer "show me the flow for X" without listing the folder and guessing the filename first.
 
-Outros comandos:
+Other commands:
 
 ```bash
 npx arc-code --help
 npx arc-code --version
 ```
 
-Os arquivos `.mmd` são [Mermaid](https://mermaid.js.org/) puro — abra com a extensão de preview do VSCode, cole em [mermaid.live](https://mermaid.live), ou renderize com `@mermaid-js/mermaid-cli`.
+The `.mmd` files are plain [Mermaid](https://mermaid.js.org/) — open them with the VSCode preview extension, paste into [mermaid.live](https://mermaid.live), or render with `@mermaid-js/mermaid-cli`.
 
-## Os 6 diagramas
+## The 6 diagrams
 
 ### architecture.mmd
-Procura nomes de pasta conhecidos (`controllers`, `services`, `domain`, `repositories`, `database`, ...) em qualquer profundidade do projeto. Se encontrar 2 ou mais, desenha a cadeia na ordem canônica (ex: `Controller → Service → Domain → Repository`). Se não encontrar, mostra o grafo real de dependências entre diretórios — nunca inventa uma camada que não existe.
+Looks for known folder names (`controllers`, `services`, `domain`, `repositories`, `database`, ...) at any depth in the project. If it finds 2 or more, it draws the chain in canonical order (e.g. `Controller → Service → Domain → Repository`). If not, it shows the real dependency graph between directories — it never invents a layer that doesn't exist.
 
 ### routes.mmd
-Detecta rotas estilo Express (`app.get/post/put/delete/patch`). Para cada rota: method, path, handler resolvido, chamadas feitas diretamente dentro do handler (profundidade 1, incluindo dentro de `async`/`await`), e tipo de retorno quando anotado.
+Detects Express-style routes (`app.get/post/put/delete/patch`). For each route: method, path, resolved handler, calls made directly inside the handler (depth 1, including inside `async`/`await`), and return type when annotated.
 
-**Limitação conhecida:** só Express. Decorators do NestJS (`@Get`, `@Controller`) não são suportados nesta versão.
+**Known limitation:** Express only. NestJS decorators (`@Get`, `@Controller`) aren't supported in this version.
 
 ### sequence.mmd
-As mesmas rotas de `routes.mmd`, como `sequenceDiagram` em vez de `flowchart` — `Client->>Handler: POST /customers`, `Handler->>customerService: create()`, `Handler-->>Client: returns void`. É o formato nativo do Mermaid pra "quem chama quem, em que ordem", então fica mais denso/legível que o flowchart equivalente pra esse tipo de informação.
+The same routes from `routes.mmd`, as a `sequenceDiagram` instead of a `flowchart` — `Client->>Handler: POST /customers`, `Handler->>customerService: create()`, `Handler-->>Client: returns void`. It's Mermaid's native format for "who calls whom, in what order," so it reads denser/clearer than the equivalent flowchart for this kind of information.
 
-**Nota técnica:** mensagens de sequence diagram usam texto crú (`Promise<void>` sem escapar), ao contrário de `routes.mmd`/`architecture.mmd`/`dependencies.mmd` que escapam `<`/`>` como entidade HTML. Isso não é inconsistência — o parser do Mermaid pra `sequenceDiagram` decodifica entidades de volta pra caractere literal antes de re-tokenizar, então `&lt;` quebra o parser pior do que um `<` crú quebraria (verificado contra o parser real, não é suposição).
+**Technical note:** sequence diagram messages use raw text (`Promise<void>` unescaped), unlike `routes.mmd`/`architecture.mmd`/`dependencies.mmd`, which escape `<`/`>` as HTML entities. This isn't an inconsistency — Mermaid's `sequenceDiagram` parser decodes entities back to literal characters before re-tokenizing, so an escaped `&lt;` breaks the parser worse than a raw `<` would (verified against the real parser, not assumed).
 
 ### classes.mmd
-Classes e interfaces, com métodos, propriedades, visibilidade e tipos. Três tipos de relação:
+Classes and interfaces, with methods, properties, visibility, and types. Three kinds of relation:
 - `--|> : extends`
 - `..|> : implements`
-- `--> : uses` — derivada de qualquer classe/interface conhecida referenciada em parâmetro de construtor, propriedade ou assinatura de método (ex: `CustomerService --> CustomerRepository` porque é injetada no construtor).
+- `--> : uses` — derived from any known class/interface referenced in a constructor parameter, property, or method signature (e.g. `CustomerService --> CustomerRepository` because it's injected in the constructor).
 
 ### dependencies.mmd
-Grafo de imports entre arquivos do projeto, mais pacotes externos. Marca:
-- **ciclos** (`A --> B` rotulado `cycle`)
-- **violações de camada** (`A --> B` rotulado `violation`) — só quando `architecture.mmd` detectou camadas conhecidas, e só na direção errada (ex: `Service` importando `Controller`). Camadas fundacionais (`domain`/`model`/`entity`) podem ser importadas por qualquer camada sem gerar violação — é o padrão esperado, não um erro.
+Import graph between the project's files, plus external packages. Flags:
+- **cycles** (`A --> B` labeled `cycle`)
+- **layer violations** (`A --> B` labeled `violation`) — only when `architecture.mmd` detected known layers, and only in the wrong direction (e.g. `Service` importing `Controller`). Foundational layers (`domain`/`model`/`entity`) can be imported by any layer without triggering a violation — that's the expected pattern, not an error.
 
 ### functions.mmd
-Toda função, método e handler de objeto literal, com:
-- assinatura simplificada (Mermaid não aceita tipos TypeScript arbitrários em `classDiagram`, então parâmetros mostram só o nome, e o tipo de retorno passa por uma sanitização: genéricos `Promise<T>` → `Promise~T~`, uniões `A | B` → `A or B`, tipos de objeto literal → `object`);
-- **complexidade Big-O estimada** (heurística — ver abaixo);
-- **grafo de chamadas** (`--> : calls`), resolvido via type-checker (não por nome de variável), restrito a chamadas para outras funções que o próprio Arc Code analisou.
+Every function, method, and object-literal handler, with:
+- a simplified signature (Mermaid doesn't accept arbitrary TypeScript types in a `classDiagram`, so parameters show only the name, and the return type goes through sanitization: generics `Promise<T>` → `Promise~T~`, unions `A | B` → `A or B`, object-literal types → `object`);
+- **estimated Big-O complexity** (heuristic — see below);
+- **call graph** (`--> : calls`), resolved via the type checker (not by variable name), restricted to calls into other functions Arc Code itself analyzed.
 
-## Sub-fluxos por recurso
+## Per-resource sub-flows
 
-Além dos 5 arquivos na raiz de `.arch/` (visão do projeto inteiro), o Arc Code detecta **recursos** pelo nome dos arquivos e gera uma subpasta com os mesmos 5 diagramas, só com aquele recorte — útil quando o projeto tem várias features e o diagrama geral fica difícil de ler.
+Besides the 6 files at the root of `.arch/` (whole-project view), Arc Code detects **resources** by filename and generates a subfolder with the same 6 diagrams, scoped to just that slice — useful when a project has several features and the overall diagram gets hard to read.
 
-Um recurso é um grupo de 2+ arquivos que compartilham o mesmo prefixo de nome, ignorando o sufixo de papel (`Controller`, `Service`, `Repository`, `Repo`, `Dao`, `Model`, `Entity`):
+A resource is a group of 2+ files that share the same name prefix, ignoring the role suffix (`Controller`, `Service`, `Repository`, `Repo`, `Dao`, `Model`, `Entity`):
 
 ```
 customerController.ts + customerService.ts + customerRepository.ts + domain/customer.ts
-  -> recurso "customer" -> .arch/domains/customer/*.mmd
+  -> resource "customer" -> .arch/domains/customer/*.mmd
 ```
 
-Arquivos de infraestrutura (`app.ts`, `index.ts`, `main.ts`, `server.ts`, `cli.ts`) e recursos com um único arquivo são ignorados — não representam um fluxo cruzando camadas.
+Infrastructure files (`app.ts`, `index.ts`, `main.ts`, `server.ts`, `cli.ts`) and resources with only one file are skipped — they don't represent a flow crossing layers.
 
-**O sub-fluxo não fica isolado só nos arquivos do próprio recurso.** Se um arquivo do recurso importa algo de outro recurso (ex: `historyService.ts` usa `DealRepository` e `PaymentRepository`), esse vizinho direto (1 salto, sem recursão) entra no recorte também — senão o diagrama de `history` pareceria não depender de nada, o que seria falso. Rotas são atribuídas ao recurso que implementa o handler (resolvido via o mesmo type-checker), não ao arquivo onde a rota é registrada — então rotas centralizadas em `app.ts` ainda aparecem no `routes.mmd` do recurso certo.
+**A sub-flow isn't limited to just the resource's own files.** If a resource's file imports something from another resource (e.g. `historyService.ts` uses `DealRepository` and `PaymentRepository`), that direct neighbor (1 hop, no recursion) is pulled into the scope too — otherwise the `history` diagram would look like it depends on nothing, which would be false. Routes are assigned to the resource that implements the handler (resolved via the same type checker), not to the file where the route is registered — so routes centralized in `app.ts` still show up in the right resource's `routes.mmd`.
 
-**Limitação conhecida:** é uma convenção de nomenclatura (`recursoController.ts`, `recursoService.ts`, ...). Projetos que não prefixam arquivos pelo nome do recurso (ex: `controller.ts` genérico, ou convenção `recurso.controller.ts` do NestJS) não vão agrupar — só os 6 arquivos da raiz são gerados.
+**Known limitation:** it's a naming convention (`resourceController.ts`, `resourceService.ts`, ...). Projects that don't prefix files by resource name (e.g. a generic `controller.ts`, or NestJS's `resource.controller.ts` convention) won't group — only the 6 root files are generated.
 
-## Mini-fluxos
+## Mini-flows
 
-Dentro de `routes/`, `sequence/`, `functions/`, `classes/` e `dependencies/`, cada arquivo é a menor unidade "navegável" daquele diagrama — a ideia é poder abrir uma rota, uma função ou uma classe isoladamente sem carregar o diagrama gigante do projeto inteiro:
+Inside `routes/`, `sequence/`, `functions/`, `classes/`, and `dependencies/`, each file is the smallest "navigable" unit of that diagram — the idea is to be able to open one route, one function, or one class in isolation without loading the whole project's giant diagram:
 
-- **`routes/<n>_<METHOD>_<path>.mmd`** — uma rota isolada: `request → handler → calls → return`, como flowchart. O índice numérico garante nome único mesmo se duas rotas tiverem paths parecidos.
-- **`sequence/<n>_<METHOD>_<path>.mmd`** — a mesma rota isolada, como `sequenceDiagram`.
-- **`functions/<Nome>.mmd`** — uma função/método mais seus vizinhos diretos **nas duas direções**: quem ela chama e quem a chama. Sem isso, olhar uma função isolada não diria nada sobre seu papel no fluxo.
-- **`classes/<Nome>.mmd`** — uma classe/interface mais suas relações diretas (extends/implements/uses), também nas duas direções — inclui quem usa essa classe, não só o que ela usa.
-- **`dependencies/<modulo>.mmd`** — um arquivo mais seus imports diretos (o que ele importa e quem o importa), com ciclos/violações já filtrados pra só os que tocam aquele módulo.
+- **`routes/<n>_<METHOD>_<path>.mmd`** — one isolated route: `request → handler → calls → return`, as a flowchart. The numeric index guarantees a unique name even if two routes have similar paths.
+- **`sequence/<n>_<METHOD>_<path>.mmd`** — the same isolated route, as a `sequenceDiagram`.
+- **`functions/<Name>.mmd`** — one function/method plus its direct neighbors **in both directions**: who it calls, and who calls it. Without that, looking at an isolated function wouldn't say anything about its role in the flow.
+- **`classes/<Name>.mmd`** — one class/interface plus its direct relations (extends/implements/uses), also in both directions — includes who uses that class, not just what it uses.
+- **`dependencies/<module>.mmd`** — one file plus its direct imports (what it imports and who imports it), with cycles/violations already filtered to only the ones touching that module.
 
-Essas pastas **não substituem** os 6 arquivos da raiz — são uma visão complementar, granular, pra quando o arquivo único vira grande demais pra ler de uma vez. Pra achar o arquivo certo sem listar a pasta, use o `index` do `manifest.json`.
+These folders **don't replace** the 6 root files — they're a complementary, granular view for when the single combined file gets too large to read at once. To find the right file without listing the folder, use `manifest.json`'s `index`.
 
-## Sobre a complexidade Big-O
+## About Big-O complexity
 
-É uma **heurística de reconhecimento de padrões no AST**, não uma prova matemática nem uma medição real (o Arc Code nunca executa o código para medir tempo). Ela reconhece:
+It's a **pattern-recognition heuristic over the AST**, not a mathematical proof or a real measurement (Arc Code never executes code to measure time). It recognizes:
 
-- profundidade de aninhamento de loops (`for`/`while`/`do`, e métodos de array como `.map`/`.forEach`/`.filter`/`.sort`) → `O(1)`, `O(n)`, `O(n²)`, ...
-- loops com contador geométrico (`i *= 2`, `n = n >> 1`) e o idioma clássico de busca binária (`low`/`high`/`mid`) → `O(log n)`
-- recursão simples vs. recursão com múltiplas chamadas (ex: Fibonacci ingênuo) → `(recursive)` / `O(2^n) (recursive, multiple self-calls)`
-- recursão divide-and-conquer com as chamadas sobre a metade do input (ex: merge sort) → `O(n log n) (recursive, divide-and-conquer)`
+- loop nesting depth (`for`/`while`/`do`, and array methods like `.map`/`.forEach`/`.filter`/`.sort`) → `O(1)`, `O(n)`, `O(n²)`, ...
+- loops with a geometric counter (`i *= 2`, `n = n >> 1`) and the classic binary-search idiom (`low`/`high`/`mid`) → `O(log n)`
+- simple recursion vs. recursion with multiple calls (e.g. naive Fibonacci) → `(recursive)` / `O(2^n) (recursive, multiple self-calls)`
+- divide-and-conquer recursion with calls over half the input (e.g. merge sort) → `O(n log n) (recursive, divide-and-conquer)`
 
-**Isso não prova nada.** Um algoritmo escrito de forma não-convencional, ou uma divisão por uma constante diferente de 2, pode escapar da detecção e aparecer como `O(n)`/`O(1)` por padrão. Trate como um primeiro sinal para revisão humana, não como verdade absoluta.
+**This proves nothing.** An algorithm written in an unconventional way, or a division by a constant other than 2, can escape detection and show up as `O(n)`/`O(1)` by default. Treat it as a first signal for human review, not as absolute truth.
 
-## Limitações de análise estática
+## Static analysis limitations
 
-- Rotas: só padrão Express (`app.method(path, handler)`); sem suporte a decorators (NestJS) nesta versão.
-- Cadeia de chamadas em `routes.mmd`: profundidade 1 (só o que o handler chama diretamente).
-- `functions.mmd`: grafo de chamadas só conecta funções que o próprio Arc Code analisou — chamadas para bibliotecas externas (Stripe, Express, etc.) são omitidas do grafo, não inventadas.
-- Genéricos TypeScript: só um nível (`Promise<Array<T>>` perde os brackets internos ao virar Mermaid-safe).
-- Camadas de arquitetura: reconhece uma lista fixa de nomes de pasta em inglês (`controller`, `service`, `domain`, `repository`, `model`, `entity`, `route`, `middleware`, `dao`, `database`, `db`). Projetos com nomenclatura diferente caem no grafo real de diretórios.
+- Routes: Express pattern only (`app.method(path, handler)`); no decorator support (NestJS) in this version.
+- Call chain in `routes.mmd`: depth 1 (only what the handler calls directly).
+- `functions.mmd`: the call graph only connects functions Arc Code itself analyzed — calls into external libraries (Stripe, Express, etc.) are omitted from the graph, not invented.
+- TypeScript generics: single level only (`Promise<Array<T>>` loses its inner brackets when becoming Mermaid-safe).
+- Architecture layers: recognizes a fixed list of English folder names (`controller`, `service`, `domain`, `repository`, `model`, `entity`, `route`, `middleware`, `dao`, `database`, `db`). Projects with different naming fall back to the real directory graph.
 
-## Desenvolvimento
+## Development
 
 ```bash
 npm install
-npm test     # build + testes (node:test embutido)
+npm test     # build + tests (built-in node:test)
 npm run build
 ```
 
-`examples/sample-project/` é uma API de CRM (Customer/Deal/Payment com Stripe + histórico agregado) usada para validar manualmente os diagramas gerados.
+`examples/sample-project/` is a CRM API (Customer/Deal/Payment with Stripe + aggregated history) used to manually validate the generated diagrams.
