@@ -1,0 +1,27 @@
+{
+  "name": "arc-code",
+  "version": "0.1.0",
+  "description": "Static architecture analyzer for TypeScript/JavaScript projects. Generates machine-readable architecture diagrams from real source code (no AI, no network).",
+  "bin": {
+    "arc-code": "dist/cli/index.js"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "rm -rf dist && tsc && chmod +x dist/cli/index.js",
+    "test": "npm run build && node --test --test-reporter spec $(find dist -name '*.test.js')",
+    "prepublishOnly": "npm run build"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "typescript": "^5.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0"
+  }
+}
